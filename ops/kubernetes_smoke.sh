@@ -19,6 +19,7 @@ kubectl --context kind-dmarc-ci rollout status deployment/dmarc-ci --timeout=180
 pod=$(kubectl --context kind-dmarc-ci get pod -l app.kubernetes.io/instance=dmarc-ci -o jsonpath='{.items[0].metadata.name}')
 kubectl --context kind-dmarc-ci exec "$pod" -c server -- python -c 'from zoho_dmarc.queries import Queries; q=Queries("/data/dmarc.sqlite"); assert q.summary("2024-10-04T00:00:00Z","2024-10-05T00:00:00Z")["totals"]["messages"]==12'
 kubectl --context kind-dmarc-ci exec "$pod" -c server -- python -c 'import sqlite3; db=sqlite3.connect("file:/data/dmarc.sqlite?mode=ro",uri=True); exec("try:\n db.execute(\"DELETE FROM reports\")\nexcept sqlite3.OperationalError:\n pass\nelse:\n raise AssertionError(\"reader could write\")")'
+kubectl --context kind-dmarc-ci exec "$pod" -c server -- python -c 'import pathlib; exec("try:\n pathlib.Path(\"/data/write-test\").write_text(\"unexpected\")\nexcept OSError:\n pass\nelse:\n raise AssertionError(\"database mount was writable\")")'
 kubectl --context kind-dmarc-ci delete pod "$pod" --wait=true
 kubectl --context kind-dmarc-ci rollout status deployment/dmarc-ci --timeout=180s
 pod=$(kubectl --context kind-dmarc-ci get pod -l app.kubernetes.io/instance=dmarc-ci -o jsonpath='{.items[0].metadata.name}')

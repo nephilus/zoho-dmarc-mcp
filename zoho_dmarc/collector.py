@@ -46,6 +46,10 @@ class Collector:
         pages = messages = 0
         try:
             self.api.validate_owner()
+            # Resume previously discovered work before starting another complete
+            # metadata inventory. A large or interrupted inventory cannot starve
+            # attachments already queued durably.
+            self.pending()
             seen_ids = set()
             seen_pages = set()
             start = 1
@@ -82,6 +86,7 @@ class Collector:
                         self.writer.enqueue(self.config.account, self.config.folder, message_id, attachment_id, received)
                 with self.writer.db:
                     self.writer.db.execute("UPDATE collection_runs SET pages=?,messages=? WHERE id=?", (pages, messages, run))
+                self.pending()
                 # Always request the next page, including after short pages.
                 start += len(batch)
             # Offset pagination has no snapshot guarantee. A second complete

@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import sys
 import yaml
+sys.path.insert(0, str(Path.cwd()))
 
 docs = [item for item in yaml.safe_load_all(sys.stdin) if item]
 deployment = next(item for item in docs if item['kind']=='Deployment')

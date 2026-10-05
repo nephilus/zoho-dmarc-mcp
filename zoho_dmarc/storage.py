@@ -115,6 +115,17 @@ class Writer:
         digest = file_hash(target)
         (directory / (name + ".sha256")).write_text(digest + "\n")
         self.checkpoint("last_backup", {"at": int(time.time()), "file": name, "sha256": digest})
+        # Prune only backups covered by a verified host export. Otherwise retain
+        # staged copies rather than silently discard the only rollback material.
+        try:
+            exported = json.loads((self.path.parent / "backup-export.json").read_text())
+            if exported.get("state") == "verified":
+                for old in directory.glob("dmarc-*.sqlite"):
+                    if old.name <= exported.get("file", "") and old.stat().st_mtime < time.time()-2*86400:
+                        old.unlink()
+                        old.with_suffix(old.suffix+".sha256").unlink(missing_ok=True)
+        except (OSError, ValueError):
+            pass
         return target
 
 

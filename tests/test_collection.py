@@ -71,6 +71,8 @@ def test_interrupted_scan_keeps_work_and_retry(tmp_path):
         _check_deadline = lambda self: None
         validate_owner = lambda self: None
         attachments = lambda self, message: [{"attachmentId": "4"}]
+        def download(self, message, attachment):
+            raise APIError("network_failure")
         def messages(self, start):
             if start == 1:
                 return [{"messageId": "3", "receivedTime": str(int(time.time()*1000))}]
@@ -78,7 +80,7 @@ def test_interrupted_scan_keeps_work_and_retry(tmp_path):
     writer = Writer(tmp_path/"history.sqlite")
     try:
         Collector(CONFIG, writer, Interrupted()).scan("backfill")
-        assert writer.db.execute("SELECT state FROM work").fetchone()[0] == "pending"
+        assert writer.db.execute("SELECT state FROM work").fetchone()[0] == "retry"
         assert Queries(writer.path).health()["status"] == "incomplete"
         assert writer.db.execute("SELECT COUNT(*) FROM checkpoints WHERE key='last_full_scan'").fetchone()[0] == 0
     finally:
