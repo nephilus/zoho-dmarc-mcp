@@ -1,0 +1,12 @@
+[project]
+name = "zoho-dmarc-mcp"
+version = "0.0.0"
+description = "Private tunnel connectivity proof for Zoho DMARC MCP"
+requires-python = ">=3.13,<3.14"
+dependencies = ["mcp==2.3.0"]
+
+[dependency-groups]
+dev = ["pytest>=8,<10"]
+
+[tool.pytest.ini_options]
+cache_dir = "/tmp/zoho-dmarc-pytest-cache"

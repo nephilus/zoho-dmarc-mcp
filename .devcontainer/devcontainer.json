@@ -1,0 +1,11 @@
+{
+  "name": "Zoho DMARC MCP",
+  "build": {"dockerfile": "Dockerfile"},
+  "remoteUser": "app",
+  "containerUser": "app",
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "runArgs": ["--cap-drop=ALL", "--security-opt=no-new-privileges", "--volume", "zoho-dmarc-dev-deps:/workspace/.venv:U"],
+  "postCreateCommand": "uv sync --frozen",
+  "forwardPorts": []
+}

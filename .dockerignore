@@ -1,0 +1,7 @@
+.git
+.private
+.env*
+private-values*.yaml
+.venv
+__pycache__
+*.sqlite*

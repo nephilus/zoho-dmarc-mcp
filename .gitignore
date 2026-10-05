@@ -1,0 +1,9 @@
+.private/
+.env*
+private-values*.yaml
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.sqlite*
+dist/
