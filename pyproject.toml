@@ -1,6 +1,6 @@
 [project]
 name = "zoho-dmarc-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Zoho DMARC attachment collection and read-only MCP reporting"
 requires-python = ">=3.13,<3.14"
 dependencies = ["mcp==2.3.0", "httpx>=0.28,<0.29", "defusedxml==0.7.1"]

@@ -3,9 +3,13 @@ on:
   workflow_dispatch:
     inputs:
       published_install:
-        description: Also verify fresh installs of the published 0.1.0 Pages and OCI charts
+        description: Also verify fresh installs of published Pages and OCI charts
         type: boolean
         default: false
+      release_version:
+        description: Published version to verify
+        type: string
+        default: '0.1.1'
   push:
     branches: [main, 'codex/**']
   pull_request:
@@ -33,6 +37,8 @@ jobs:
   published:
     if: github.event_name == 'workflow_dispatch' && inputs.published_install
     runs-on: ubuntu-latest
+    env:
+      CHART_VERSION: ${{ inputs.release_version || '0.1.1' }}
     strategy:
       matrix:
         chart: [pages, oci]
@@ -42,7 +48,7 @@ jobs:
       - name: Build development environment and pull anonymous published image
         run: |
           docker build -t dmarc-dev .devcontainer
-          docker pull ghcr.io/nephilus/zoho-dmarc-mcp:v0.1.0
-          docker tag ghcr.io/nephilus/zoho-dmarc-mcp:v0.1.0 dmarc-ci:latest
+          docker pull "ghcr.io/nephilus/zoho-dmarc-mcp:v$CHART_VERSION"
+          docker tag "ghcr.io/nephilus/zoho-dmarc-mcp:v$CHART_VERSION" dmarc-ci:latest
       - name: Fresh Helm install and persistence verification
         run: sh ops/kubernetes_smoke.sh '${{ matrix.chart }}'

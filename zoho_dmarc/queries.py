@@ -85,7 +85,10 @@ class Queries:
             item = observed.setdefault(row["reporter"], {"periods": [], "conflict": False})
             item["conflict"] |= bool(row["conflict"])
             if not row["conflict"]:
-                item["periods"].append((max(begin, row["begin"]), min(end, row["end"])))
+                # Aggregate report timestamps include the last covered second;
+                # represent coverage as half-open intervals to avoid fictitious
+                # one-second gaps between adjacent daily reports.
+                item["periods"].append((max(begin, row["begin"]), min(end, row["end"] + 1)))
         coverage = []
         for reporter, item in observed.items():
             position = begin

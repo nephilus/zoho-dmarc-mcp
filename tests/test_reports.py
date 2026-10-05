@@ -125,3 +125,16 @@ def test_response_budget_accounts_for_mcp_envelope():
 def test_policy_domain_subdomain_is_valid():
     data = XML.replace(b'<header_from>example.test', b'<header_from>mail.example.test')
     assert parse(data, ('example.test',))[0]['rows'][0]['header_from']=='mail.example.test'
+
+
+def test_adjacent_inclusive_report_periods_have_no_false_gap(tmp_path):
+    writer=Writer(tmp_path/'history.sqlite')
+    try:
+        first=XML.replace(b'<end>1728086400', b'<end>1728086399')
+        second=XML.replace(b'<report_id>abc', b'<report_id>second').replace(b'<begin>1728000000', b'<begin>1728086400').replace(b'<end>1728086400', b'<end>1728172799')
+        writer.ingest(enqueue(writer), parse(first, ('example.test',)))
+        writer.ingest(enqueue(writer,'2'), parse(second, ('example.test',)))
+        answer=Queries(writer.path).summary('2024-10-04T00:00:00Z','2024-10-06T00:00:00Z')
+        assert answer['coverage']['observed_reporters'][0]['uncovered_periods']==[]
+    finally:
+        writer.close()

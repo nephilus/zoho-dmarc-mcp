@@ -3,7 +3,7 @@
 Downloads DMARC attachments from an explicitly configured Zoho folder into SQLite
 and exposes bounded read-only reporting through OpenAI Secure MCP Tunnel. Raw
 attachments and message bodies are discarded. The application and chart are
-available as release `0.1.0`; real-account and host acceptance are operator checks.
+available as release `0.1.1`; real-account and host acceptance are operator checks.
 
 ## Development
 
@@ -46,7 +46,7 @@ Use a rootful Podman machine on Windows and select its connection explicitly wit
 minikube start -p zoho-dmarc --driver=podman --container-runtime=cri-o --cpus=4 --memory=4096 --keep-context
 helm repo add zoho-dmarc https://nephilus.github.io/zoho-dmarc-mcp/
 helm repo update
-helm upgrade --install zoho-dmarc zoho-dmarc/zoho-dmarc-mcp --version 0.1.0 --kube-context zoho-dmarc --namespace zoho-dmarc --create-namespace -f private-values.yaml --wait
+helm upgrade --install zoho-dmarc zoho-dmarc/zoho-dmarc-mcp --version 0.1.1 --kube-context zoho-dmarc --namespace zoho-dmarc --create-namespace -f private-values.yaml --wait
 ```
 
 OCI alternative: substitute `oci://ghcr.io/nephilus/charts/zoho-dmarc-mcp` for the
@@ -168,7 +168,7 @@ CI uses the development container, tests parser/collector/storage, smoke-tests t
 runtime image, checks Helm boundaries, and deploys synthetic Zoho/tunnel fixtures
 to disposable Kind, including Pod replacement and persistence. Fixtures are mounted
 only during CI and are excluded from the production image.
-Manual CI input `published_install=true` additionally performs fresh Helm installs
+Manual CI input `published_install=true` with `release_version` performs fresh Helm installs
 from both the Pages index and GHCR OCI chart using synthetic fixtures. These tests
 use Helm 3 executable post-renderers; the production chart also works with Helm 4.
 
