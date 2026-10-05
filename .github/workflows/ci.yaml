@@ -9,7 +9,7 @@ on:
       release_version:
         description: Published version to verify
         type: string
-        default: '0.1.1'
+        default: '0.1.2'
   push:
     branches: [main, 'codex/**']
   pull_request:
@@ -38,7 +38,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.published_install
     runs-on: ubuntu-latest
     env:
-      CHART_VERSION: ${{ inputs.release_version || '0.1.1' }}
+      CHART_VERSION: ${{ inputs.release_version || '0.1.2' }}
     strategy:
       matrix:
         chart: [pages, oci]
@@ -52,3 +52,4 @@ jobs:
           docker tag "ghcr.io/nephilus/zoho-dmarc-mcp:v$CHART_VERSION" dmarc-ci:latest
       - name: Fresh Helm install and persistence verification
         run: sh ops/kubernetes_smoke.sh '${{ matrix.chart }}'
+

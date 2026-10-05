@@ -123,10 +123,14 @@ overlap locally; weekly reconciliation checks all available history. Pagination
 continues to an empty page and a second full inventory must agree before completion.
 Changes, deadlines and pending retries leave scans incomplete. Discovered work is
 durable, and ingestion commits atomically with completion. Retries are bounded with
-capped exponential backoff. Rejections retain reasons and provenance, not contents.
+capped exponential backoff. Transient incomplete scans retry after one minute, doubling
+up to 15 minutes; successful scans resume hourly polling. Credential and ownership
+errors retain hourly polling. Rejections retain reasons and provenance, not contents.
 
 Mailbox calls are GET-only; OAuth exchange uses POST. Account ownership is validated
-before collection. XML, gzip and ZIP containing XML are supported. Unsafe paths,
+before collection. XML, gzip and ZIP containing XML are supported, including legacy
+and [RFC 9990](https://www.rfc-editor.org/rfc/rfc9990.html) DMARC namespaces.
+Foreign namespace extensions cannot replace core fields. Unsafe paths,
 symlinks, nested archives, DTDs/entities, invalid fields and unapproved domains are
 rejected. Defaults: 10 MiB input, 50 MiB expansion, 16 entries, 100:1 ratio, depth
 32, 100,000 records and a 30-second worker deadline, with Linux CPU/memory limits.
@@ -180,4 +184,5 @@ with publishing rights only in the trusted release job. PRs receive no publishin
 credentials. Real account, reboot and backup acceptance are operator checks.
 The retained `gh-pages` branch can be republished independently with the
 `Republish Helm Pages` workflow, without rebuilding or replacing releases.
+
 
