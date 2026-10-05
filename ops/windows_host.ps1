@@ -31,8 +31,13 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Machine start failed' }
     }
     $env:CONTAINER_CONNECTION = 'podman-machine-dmarc-root'
-    minikube start -p zoho-dmarc --driver=podman --container-runtime=cri-o --cpus=4 --memory=4096 --keep-context
-    if ($LASTEXITCODE -ne 0) { throw 'Cluster start failed' }
+    $clusterState = minikube status -p zoho-dmarc --output=json | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0 -or $clusterState.Host -ne 'Running' -or $clusterState.Kubelet -ne 'Running' -or $clusterState.APIServer -ne 'Running') {
+        minikube start -p zoho-dmarc --driver=podman --container-runtime=cri-o --cpus=4 --memory=4096 --keep-context
+        if ($LASTEXITCODE -ne 0) { throw 'Cluster start failed' }
+    }
+    kubectl --context zoho-dmarc -n zoho-dmarc rollout status deployment/zoho-dmarc --timeout=300s
+    if ($LASTEXITCODE -ne 0) { throw 'Application startup failed' }
     $pod = kubectl --context zoho-dmarc -n zoho-dmarc get pod -l app.kubernetes.io/instance=zoho-dmarc -o jsonpath='{.items[0].metadata.name}'
     if ($LASTEXITCODE -ne 0 -or -not $pod) { throw 'Collector Pod unavailable' }
     $items = kubectl --context zoho-dmarc -n zoho-dmarc exec $pod -c collector -- python -m zoho_dmarc backup-list | ConvertFrom-Json

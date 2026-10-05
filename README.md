@@ -3,7 +3,7 @@
 Downloads DMARC attachments from an explicitly configured Zoho folder into SQLite
 and exposes bounded read-only reporting through OpenAI Secure MCP Tunnel. Raw
 attachments and message bodies are discarded. The application and chart are
-implemented; release publication and real-account acceptance are being verified.
+available as release `0.1.0`; real-account and host acceptance are operator checks.
 
 ## Development
 
@@ -175,3 +175,5 @@ the retained GitHub Pages Helm index. Evidence records commit, chart version, bo
 image digests and checks. Actions are SHA-pinned; permissions default to read-only,
 with publishing rights only in the trusted release job. PRs receive no publishing
 credentials. Real account, reboot and backup acceptance are operator checks.
+The retained `gh-pages` branch can be republished independently with the
+`Republish Helm Pages` workflow, without rebuilding or replacing releases.
