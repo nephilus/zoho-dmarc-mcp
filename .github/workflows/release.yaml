@@ -5,6 +5,9 @@ on:
     tags: ['v*']
 permissions:
   contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   publish:
     if: github.repository == 'nephilus/zoho-dmarc-mcp' && startsWith(github.ref, 'refs/tags/v')
@@ -19,6 +22,14 @@ jobs:
         run: |
           test "$GITHUB_REF_NAME" = "v$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml)"
           test "$GITHUB_REF_NAME" = "v$(sed -n 's/^version: //p' charts/zoho-dmarc-mcp/Chart.yaml)"
+      - name: Refuse to replace an existing release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo 'This release already exists; its images and charts must remain immutable.'
+            exit 1
+          fi
       - name: Run tests in devcontainer
         run: |
           docker build -t dmarc-dev .devcontainer
