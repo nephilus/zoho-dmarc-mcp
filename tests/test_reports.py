@@ -113,3 +113,15 @@ def test_replay_conflict_atomicity_readonly_and_backup(tmp_path):
 def test_query_bounds(tmp_path, start, end, size, cursor):
     with pytest.raises(ValueError):
         Queries(tmp_path/"none").summary(start, end, size, cursor)
+
+
+def test_response_budget_accounts_for_mcp_envelope():
+    from zoho_dmarc.queries import bounded
+    with pytest.raises(ValueError, match='response_limit'):
+        bounded({'value':'x'*140000})
+    assert bounded({'value':'x'*100})['value']=='x'*100
+
+
+def test_policy_domain_subdomain_is_valid():
+    data = XML.replace(b'<header_from>example.test', b'<header_from>mail.example.test')
+    assert parse(data, ('example.test',))[0]['rows'][0]['header_from']=='mail.example.test'

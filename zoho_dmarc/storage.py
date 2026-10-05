@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS work(
 CREATE TABLE IF NOT EXISTS provenance(
  work INTEGER NOT NULL REFERENCES work(id), report INTEGER NOT NULL REFERENCES reports(id),
  UNIQUE(work,report));
+CREATE INDEX IF NOT EXISTS work_retry ON work(state,next_attempt,id);
+CREATE INDEX IF NOT EXISTS report_conflicts ON reports(conflict,reporter,report_id,domain,begin,end);
 CREATE TABLE IF NOT EXISTS collection_runs(
  id INTEGER PRIMARY KEY, started INTEGER NOT NULL, finished INTEGER,
  kind TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'incomplete',
@@ -44,6 +46,30 @@ def file_hash(path):
         for chunk in iter(lambda: stream.read(1024*1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def create_backup(db, directory):
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    name = time.strftime("dmarc-%Y%m%dT%H%M%SZ.sqlite", time.gmtime())
+    target = directory / name
+    staging = directory / (name + ".partial")
+    # Exclusive staging creation prevents concurrent operators from sharing a
+    # destination. SQLite backup API provides a consistent live source snapshot.
+    with staging.open("xb"):
+        pass
+    try:
+        with sqlite3.connect(staging) as backup:
+            db.backup(backup)
+            if backup.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                raise RuntimeError("backup_integrity_failed")
+        if target.exists():
+            raise RuntimeError("backup_destination_exists")
+        staging.replace(target)
+        (directory / (name + ".sha256")).write_text(file_hash(target) + "\n")
+        return target
+    finally:
+        staging.unlink(missing_ok=True)
 
 
 class Writer:
@@ -103,17 +129,9 @@ class Writer:
 
     def backup(self, directory):
         directory = Path(directory)
-        directory.mkdir(parents=True, exist_ok=True)
-        name = time.strftime("dmarc-%Y%m%dT%H%M%SZ.sqlite", time.gmtime())
-        target = directory / name
-        staging = directory / (name + ".partial")
-        with sqlite3.connect(staging) as backup:
-            self.db.backup(backup)
-            if backup.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
-                raise RuntimeError("backup_integrity_failed")
-        staging.replace(target)
+        target = create_backup(self.db, directory)
+        name = target.name
         digest = file_hash(target)
-        (directory / (name + ".sha256")).write_text(digest + "\n")
         self.checkpoint("last_backup", {"at": int(time.time()), "file": name, "sha256": digest})
         # Prune only backups covered by a verified host export. Otherwise retain
         # staged copies rather than silently discard the only rollback material.

@@ -30,7 +30,10 @@ def bounds(start, end, page_size, cursor):
 
 
 def bounded(value):
-    if len(json.dumps(value, ensure_ascii=True, separators=(",", ":")).encode()) > 256 * 1024:
+    # MCP SDK emits both structuredContent and a textual JSON representation.
+    # Include conservative formatting/escaping plus JSON-RPC envelope headroom.
+    wire = {"content": [{"type": "text", "text": json.dumps(value, ensure_ascii=True, indent=4)}], "structuredContent": value, "isError": False}
+    if len(json.dumps(wire, ensure_ascii=True, indent=4).encode()) > 255 * 1024:
         raise ValueError("response_limit_use_smaller_page_or_window")
     return value
 

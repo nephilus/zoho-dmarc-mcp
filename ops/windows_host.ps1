@@ -43,8 +43,14 @@ try {
         $target = Join-Path $BackupDirectory $item.file
         if (-not (Test-Path -LiteralPath $target) -or (Get-FileHash -LiteralPath $target).Hash.ToLowerInvariant() -ne $item.sha256) {
             $staging = $target + '.partial'
-            kubectl --context zoho-dmarc -n zoho-dmarc cp -c collector "${pod}:/data/backups/$($item.file)" $staging
-            if ($LASTEXITCODE -ne 0 -or (Get-FileHash -LiteralPath $staging -Algorithm SHA256).Hash.ToLowerInvariant() -ne $item.sha256) { throw 'Backup transfer verification failed' }
+            # A relative destination avoids kubectl interpreting a Windows drive
+            # colon as another remote Pod specification.
+            Push-Location -LiteralPath $BackupDirectory
+            try {
+                kubectl --context zoho-dmarc -n zoho-dmarc cp -c collector "${pod}:/data/backups/$($item.file)" ("./" + $item.file + '.partial')
+                if ($LASTEXITCODE -ne 0) { throw 'Backup transfer failed' }
+            } finally { Pop-Location }
+            if ((Get-FileHash -LiteralPath $staging -Algorithm SHA256).Hash.ToLowerInvariant() -ne $item.sha256) { throw 'Backup transfer verification failed' }
             Move-Item -LiteralPath $staging -Destination $target -Force
         }
         [IO.File]::WriteAllText($target + '.sha256', $item.sha256 + "`n")

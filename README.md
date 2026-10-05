@@ -130,6 +130,8 @@ before collection. XML, gzip and ZIP containing XML are supported. Unsafe paths,
 symlinks, nested archives, DTDs/entities, invalid fields and unapproved domains are
 rejected. Defaults: 10 MiB input, 50 MiB expansion, 16 entries, 100:1 ratio, depth
 32, 100,000 records and a 30-second worker deadline, with Linux CPU/memory limits.
+The allowlist applies to published policy domains; header-from subdomains of an
+allowed policy domain are accepted.
 
 Collector holds an exclusive writer lock and persistent WAL connection. MCP mounts
 SQLite read-only and receives no Zoho credentials. Containers use UID 10001,
@@ -153,7 +155,8 @@ python -m zoho_dmarc backup
 python -m zoho_dmarc reconcile
 ```
 
-Backup/reconcile require exclusive writer ownership: stop the collector first.
+Reconciliation requires exclusive writer ownership: stop the collector first.
+Operator backup opens the live source read-only and uses SQLite's backup API.
 Restore requires a matching `.sha256` file and a new target and checks integrity.
 Verify restoration in a disposable instance before relying on backups. Helm
 uninstall retains the PVC; cluster deletion does not. Verify a host backup before

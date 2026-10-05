@@ -24,6 +24,11 @@ def main():
         raise SystemExit(0 if heartbeat.exists() and time.time()-int(heartbeat.read_text()) < 7500 else 1)
     elif args.command == "backup-list":
         print(json.dumps([{"file": path.name, "sha256": path.with_suffix(path.suffix+".sha256").read_text().strip()} for path in sorted((Path(database()).parent/"backups").glob("*.sqlite"))]))
+    elif args.command == "backup":
+        from .storage import reader, create_backup
+        with reader(database()) as source:
+            target = create_backup(source, Path(database()).parent/'backups')
+        print(json.dumps({'file': target.name}))
     elif args.command == "restore":
         if not args.source or not args.target or Path(args.target).exists():
             parser.error("restore needs source and a new target")
@@ -41,14 +46,11 @@ def main():
         from .storage import Writer
         writer = Writer(database())
         try:
-            if args.command == "backup":
-                writer.backup(Path(database()).parent / "backups")
-            else:
-                from .config import Config
-                from .collector import Collector
-                from .zoho import Zoho
-                config = Config.load()
-                Collector(config, writer, Zoho(config)).scan("reconcile")
+            from .config import Config
+            from .collector import Collector
+            from .zoho import Zoho
+            config = Config.load()
+            Collector(config, writer, Zoho(config)).scan("reconcile")
         finally:
             writer.close()
 

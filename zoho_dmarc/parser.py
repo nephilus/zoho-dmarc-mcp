@@ -114,7 +114,7 @@ def _xml(payload, allowlist, limits):
             "spf": _choice(record, "row/policy_evaluated/spf", {"pass", "fail"}),
             "header_from": domain(_text(record, "identifiers/header_from")),
         }
-        if row["header_from"] != report_domain:
+        if row["header_from"] != report_domain and not row["header_from"].endswith("." + report_domain):
             raise Rejected("header_domain_mismatch")
         rows.append(row)
     # A canonical multiset makes record order irrelevant without dropping duplicates.
