@@ -138,3 +138,13 @@ def test_adjacent_inclusive_report_periods_have_no_false_gap(tmp_path):
         assert answer['coverage']['observed_reporters'][0]['uncovered_periods']==[]
     finally:
         writer.close()
+
+@pytest.mark.parametrize('namespace', ['http://dmarc.org/dmarc-xml/0.1', 'urn:ietf:params:xml:ns:dmarc-2.0'])
+def test_namespaced_reports_keep_limits_and_foreign_fields(namespace):
+    xml = XML.replace(b'<feedback>', ('<feedback xmlns="' + namespace + '">').encode()).replace(b'<disposition>none', b'<disposition>pass')
+    assert parse(xml, ('example.test',))[0]['rows'][0]['disposition'] == 'pass'
+    with pytest.raises(Rejected, match='record_limit'):
+        parse(xml, ('example.test',), replace(Limits(), records=0))
+    forged = xml.replace(b'<count>12</count>', b'<count xmlns="urn:foreign">12</count>')
+    with pytest.raises(Rejected, match='missing_or_duplicate_field'):
+        parse(forged, ('example.test',))

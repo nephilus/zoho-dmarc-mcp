@@ -116,11 +116,23 @@ class Collector:
             self.writer.checkpoint("last_metadata_scan", {"at": int(time.time()), "kind": kind, "pages": pages, "messages": messages})
             if kind in {"backfill", "reconcile"}:
                 self.writer.checkpoint("last_full_scan", int(time.time()))
+            return "attachment_retries_pending" if unfinished else None
         except APIError as exc:
             with self.writer.db:
                 self.writer.db.execute("UPDATE collection_runs SET finished=?,reason=? WHERE id=?", (int(time.time()), str(exc), run))
+            return str(exc)
         finally:
             self.api.deadline = float("inf")
+
+
+def retry_delay(reason, consecutive_failures):
+    """Retry transient incomplete scans promptly, with a bounded backoff."""
+    transient = {"oauth_network_failure", "network_failure", "upstream_unavailable",
+                 "rate_limited", "retry_limit", "unstable_pagination",
+                 "attachment_retries_pending", "scan_time_limit"}
+    if reason not in transient:
+        return 3600
+    return min(900, 60 * 2 ** min(max(consecutive_failures - 1, 0), 4))
 
 
 def run():
@@ -136,20 +148,22 @@ def run():
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     heartbeat = Path(database()).parent / "collector-heartbeat"
+    consecutive_failures = 0
     try:
         while not stopping:
             checkpoint = writer.db.execute("SELECT value FROM checkpoints WHERE key='last_full_scan'").fetchone()
             full_at = json.loads(checkpoint[0]) if checkpoint else None
             kind = "backfill" if full_at is None else "reconcile" if time.time()-full_at >= 7*86400 else "poll"
             heartbeat.write_text(str(int(time.time())))
-            collector.scan(kind)
+            reason = collector.scan(kind)
+            consecutive_failures = consecutive_failures + 1 if reason else 0
             backup = writer.db.execute("SELECT value FROM checkpoints WHERE key='last_backup'").fetchone()
             first_history = not writer.db.execute("SELECT 1 FROM checkpoints WHERE key='first_history_backup'").fetchone() and writer.db.execute("SELECT 1 FROM reports LIMIT 1").fetchone()
             if first_history or backup is None or time.time()-json.loads(backup[0])["at"] >= 86400:
                 writer.backup(Path(database()).parent / "backups")
                 if first_history:
                     writer.checkpoint("first_history_backup", int(time.time()))
-            for _ in range(3600):
+            for _ in range(retry_delay(reason, consecutive_failures)):
                 if stopping:
                     break
                 heartbeat.write_text(str(int(time.time())))

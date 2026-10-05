@@ -68,12 +68,21 @@ def _xml(payload, allowlist, limits):
     depth = 0
     count = 0
     root = None
+    namespace = None
     try:
         for event, elem in ET.iterparse(io.BytesIO(payload), events=("start", "end"), forbid_dtd=True, forbid_entities=True, forbid_external=True):
             if event == "start":
                 depth += 1
                 if root is None:
                     root = elem
+                    namespace = elem.tag.split("}", 1)[0][1:] if elem.tag.startswith("{") else ""
+                    if namespace not in {"", "http://dmarc.org/dmarc-xml/0.1", "urn:ietf:params:xml:ns:dmarc-2.0"}:
+                        raise Rejected("unsupported_xml_namespace")
+                # Normalize only the report namespace. Foreign extensions cannot
+                # impersonate core fields, and namespaced records retain limits.
+                prefix = "{" + namespace + "}" if namespace else ""
+                if prefix and elem.tag.startswith(prefix):
+                    elem.tag = elem.tag[len(prefix):]
                 if depth > limits.depth:
                     raise Rejected("xml_depth")
                 if elem.tag == "record":
@@ -109,7 +118,7 @@ def _xml(payload, allowlist, limits):
             raise Rejected("invalid_source_ip") from None
         row = {
             "source_ip": ip, "count": _number(record, "row/count", minimum=1),
-            "disposition": _choice(record, "row/policy_evaluated/disposition", {"none", "quarantine", "reject"}),
+            "disposition": _choice(record, "row/policy_evaluated/disposition", {"none", "pass", "quarantine", "reject"}),
             "dkim": _choice(record, "row/policy_evaluated/dkim", {"pass", "fail"}),
             "spf": _choice(record, "row/policy_evaluated/spf", {"pass", "fail"}),
             "header_from": domain(_text(record, "identifiers/header_from")),

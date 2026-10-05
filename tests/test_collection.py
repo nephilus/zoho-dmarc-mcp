@@ -102,3 +102,29 @@ def test_never_initialized_stale_empty_and_owner_rejection(tmp_path):
             api.validate_owner()
     finally:
         writer.close()
+
+def test_transient_startup_recovery(tmp_path):
+    from zoho_dmarc.collector import retry_delay
+    class Startup:
+        deadline = float('inf')
+        _check_deadline = lambda self: None
+        failed = False
+        def validate_owner(self):
+            if not self.failed:
+                self.failed = True
+                raise APIError('oauth_network_failure')
+        messages = lambda self, start: []
+    writer = Writer(tmp_path/'history.sqlite')
+    try:
+        collector = Collector(CONFIG, writer, Startup())
+        reason = collector.scan('backfill')
+        assert Queries(writer.path).health()['status'] == 'incomplete'
+        assert retry_delay(reason, 1) == 60
+        assert retry_delay(reason, 20) == 900
+        assert collector.scan('backfill') is None
+        assert Queries(writer.path).health()['status'] == 'healthy'
+        assert retry_delay(None, 0) == 3600
+        assert retry_delay('oauth_refresh_failed', 1) == 3600
+        assert retry_delay('account_owner_mismatch', 1) == 3600
+    finally:
+        writer.close()
