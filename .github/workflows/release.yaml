@@ -1,12 +1,13 @@
 name: Release
 on:
+  workflow_dispatch:
   push:
     tags: ['v*']
 permissions:
   contents: read
 jobs:
   publish:
-    if: github.repository == 'nephilus/zoho-dmarc-mcp'
+    if: github.repository == 'nephilus/zoho-dmarc-mcp' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write

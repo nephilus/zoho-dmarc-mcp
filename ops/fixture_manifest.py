@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import sys
 import yaml
@@ -7,7 +8,7 @@ docs = [item for item in yaml.safe_load_all(sys.stdin) if item]
 deployment = next(item for item in docs if item['kind']=='Deployment')
 pod = deployment['spec']['template']['spec']
 for container in pod['containers']:
-    container['image'] = 'dmarc-ci:latest'
+    container['image'] = os.getenv('FIXTURE_IMAGE', 'dmarc-ci:latest')
     container['imagePullPolicy'] = 'Never'
     if container['name'] in {'collector', 'tunnel'}:
         container['command'] = ['python', '/fixtures/runtime.py', container['name']]
