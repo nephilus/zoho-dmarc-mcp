@@ -1,6 +1,11 @@
 name: Validate
 on:
   workflow_dispatch:
+    inputs:
+      published_install:
+        description: Also verify fresh installs of the published 0.1.0 Pages and OCI charts
+        type: boolean
+        default: false
   push:
     branches: [main, 'codex/**']
   pull_request:
@@ -25,3 +30,19 @@ jobs:
           docker run --rm --user root -v "$PWD:/workspace" -w /workspace dmarc-dev sh -c 'sh ops/install_helm.sh && uv run --frozen "$HOME/.local/bin/helm" lint charts/zoho-dmarc-mcp --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa && "$HOME/.local/bin/helm" template fixture charts/zoho-dmarc-mcp --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | uv run --frozen python ops/validate_chart.py'
       - name: Synthetic Kubernetes deployment
         run: sh ops/kubernetes_smoke.sh
+  published:
+    if: github.event_name == 'workflow_dispatch' && inputs.published_install
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        chart: [pages, oci]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false}
+      - name: Build development environment and pull anonymous published image
+        run: |
+          docker build -t dmarc-dev .devcontainer
+          docker pull ghcr.io/nephilus/zoho-dmarc-mcp:v0.1.0
+          docker tag ghcr.io/nephilus/zoho-dmarc-mcp:v0.1.0 dmarc-ci:latest
+      - name: Fresh Helm install and persistence verification
+        run: sh ops/kubernetes_smoke.sh '${{ matrix.chart }}'

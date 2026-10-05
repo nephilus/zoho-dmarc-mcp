@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-version=v4.3.0
+version=${HELM_VERSION:-v4.3.0}
 archive="helm-${version}-linux-amd64.tar.gz"
 directory="$(mktemp -d)"
 trap 'rm -rf "$directory"' EXIT

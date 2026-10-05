@@ -168,6 +168,9 @@ CI uses the development container, tests parser/collector/storage, smoke-tests t
 runtime image, checks Helm boundaries, and deploys synthetic Zoho/tunnel fixtures
 to disposable Kind, including Pod replacement and persistence. Fixtures are mounted
 only during CI and are excluded from the production image.
+Manual CI input `published_install=true` additionally performs fresh Helm installs
+from both the Pages index and GHCR OCI chart using synthetic fixtures. These tests
+use Helm 3 executable post-renderers; the production chart also works with Helm 4.
 
 Trusted `v*` tags publish `ghcr.io/nephilus/zoho-dmarc-mcp` and the packaged chart to
 `oci://ghcr.io/nephilus/charts/zoho-dmarc-mcp`. The identical package is added to

@@ -22,8 +22,18 @@ if ! command -v kind >/dev/null 2>&1; then
 fi
 kind create cluster --name "$cluster" --wait 120s
 kind load docker-image dmarc-ci:latest --name "$cluster"
-docker run --rm --user root -v "$PWD:/workspace" -w /workspace dmarc-dev sh -c 'sh ops/install_helm.sh && "$HOME/.local/bin/helm" template dmarc-ci charts/zoho-dmarc-mcp --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | uv run --frozen python ops/fixture_manifest.py' > /tmp/dmarc-ci.yaml
-kubectl --context kind-dmarc-ci apply -f /tmp/dmarc-ci.yaml
+docker run --rm --user root -v "$PWD:/workspace" -w /workspace dmarc-dev sh -c 'HELM_VERSION=v3.22.0 sh ops/install_helm.sh && cp "$HOME/.local/bin/helm" /workspace/.helm-ci'
+chmod +x ops/ci_postrender.sh
+chart=${1:-charts/zoho-dmarc-mcp}
+if [ "$chart" = pages ]; then
+  ./.helm-ci repo add zoho-dmarc https://nephilus.github.io/zoho-dmarc-mcp/
+  ./.helm-ci repo update
+  ./.helm-ci install dmarc-ci zoho-dmarc/zoho-dmarc-mcp --version 0.1.0 --kube-context kind-dmarc-ci --post-renderer "$PWD/ops/ci_postrender.sh" --wait --timeout 180s
+elif [ "$chart" = oci ]; then
+  ./.helm-ci install dmarc-ci oci://ghcr.io/nephilus/charts/zoho-dmarc-mcp --version 0.1.0 --kube-context kind-dmarc-ci --post-renderer "$PWD/ops/ci_postrender.sh" --wait --timeout 180s
+else
+  ./.helm-ci install dmarc-ci "$chart" --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --kube-context kind-dmarc-ci --post-renderer "$PWD/ops/ci_postrender.sh" --wait --timeout 180s
+fi
 kubectl --context kind-dmarc-ci rollout status deployment/dmarc-ci --timeout=180s
 pod=$(kubectl --context kind-dmarc-ci get pod -l app.kubernetes.io/instance=dmarc-ci -o jsonpath='{.items[0].metadata.name}')
 kubectl --context kind-dmarc-ci exec "$pod" -c server -- python -c 'from zoho_dmarc.queries import Queries; import time; q=Queries("/data/dmarc.sqlite"); exec("for attempt in range(60):\n result=q.summary(\"2024-10-04T00:00:00Z\",\"2024-10-05T00:00:00Z\")\n if result[\"totals\"][\"messages\"]==12: break\n time.sleep(1)\nelse: raise AssertionError(q.health())")'
