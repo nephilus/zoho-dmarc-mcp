@@ -21,6 +21,7 @@ if ($RegisterTask) {
 New-Item -ItemType Directory -Path $BackupDirectory -Force | Out-Null
 $backupRoot = [IO.Path]::GetFullPath($BackupDirectory).TrimEnd('\') + '\'
 $previousConnection = $env:CONTAINER_CONNECTION
+$previousContext = kubectl config current-context 2>$null
 $pod = $null
 $status = @{state='failed'; at=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds(); reason='host_start_or_export_failed'}
 try {
@@ -76,5 +77,8 @@ try {
         $payload | kubectl --context zoho-dmarc -n zoho-dmarc exec -i $pod -c collector -- python -c 'import json,sys,pathlib; data=json.load(sys.stdin); p=pathlib.Path("/data/backup-export.json"); t=p.with_suffix(".partial"); t.write_text(json.dumps(data)); t.replace(p)'
     }
     $env:CONTAINER_CONNECTION = $previousConnection
+    if ($previousContext -and (kubectl config current-context 2>$null) -ne $previousContext) {
+        kubectl config use-context $previousContext | Out-Null
+    }
 }
 if ($status.state -ne 'verified') { exit 1 }
