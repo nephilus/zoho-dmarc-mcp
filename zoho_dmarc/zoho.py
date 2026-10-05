@@ -24,6 +24,16 @@ class Zoho:
 
     def refresh(self):
         self._check_deadline()
+        for attempt in range(4):
+            try:
+                return self._refresh_once()
+            except httpx.HTTPError:
+                delay = 2**attempt
+                if attempt == 3 or time.monotonic()+delay >= self.deadline:
+                    raise APIError("oauth_network_failure") from None
+                time.sleep(delay)
+
+    def _refresh_once(self):
         try:
             response = self.client.post(self.oauth_url + "/oauth/v2/token", data={
                 "grant_type": "refresh_token", "client_id": os.environ["ZOHO_CLIENT_ID"],
@@ -34,7 +44,7 @@ class Zoho:
                 raise APIError("oauth_refresh_failed")
             self.token = payload["access_token"]
             self.expires = time.monotonic() + min(3600, int(payload.get("expires_in", 3600))) - 60
-        except (httpx.HTTPError, ValueError, KeyError):
+        except (ValueError, KeyError):
             raise APIError("oauth_refresh_failed") from None
 
     def get(self, path, params=None, binary=False):

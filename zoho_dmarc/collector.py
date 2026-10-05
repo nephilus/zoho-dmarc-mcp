@@ -144,8 +144,11 @@ def run():
             heartbeat.write_text(str(int(time.time())))
             collector.scan(kind)
             backup = writer.db.execute("SELECT value FROM checkpoints WHERE key='last_backup'").fetchone()
-            if backup is None or time.time()-json.loads(backup[0])["at"] >= 86400:
+            first_history = not writer.db.execute("SELECT 1 FROM checkpoints WHERE key='first_history_backup'").fetchone() and writer.db.execute("SELECT 1 FROM reports LIMIT 1").fetchone()
+            if first_history or backup is None or time.time()-json.loads(backup[0])["at"] >= 86400:
                 writer.backup(Path(database()).parent / "backups")
+                if first_history:
+                    writer.checkpoint("first_history_backup", int(time.time()))
             for _ in range(3600):
                 if stopping:
                     break

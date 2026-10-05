@@ -7,6 +7,15 @@ from pathlib import Path
 import sys
 
 if __name__ == "__main__" and sys.argv[1] == "collector":
+    from urllib.request import urlopen
+    for attempt in range(30):
+        try:
+            with urlopen('http://127.0.0.1:8080/readyz', timeout=1):
+                break
+        except OSError:
+            time.sleep(1)
+    else:
+        raise RuntimeError('synthetic_upstream_did_not_start')
     from zoho_dmarc import config
     config.REGIONS["com"] = ("http://127.0.0.1:9000", "http://127.0.0.1:9000")
     from zoho_dmarc.collector import run
