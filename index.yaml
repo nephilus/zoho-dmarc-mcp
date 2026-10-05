@@ -1,3 +1,15 @@
 apiVersion: v1
-entries: {}
-generated: '2026-10-05T00:00:00Z'
+entries:
+  zoho-dmarc-mcp:
+  - apiVersion: v2
+    appVersion: 0.1.0
+    created: "2026-10-05T15:23:17.143247474Z"
+    description: Zoho DMARC collection and read-only MCP through OpenAI Secure MCP
+      Tunnel
+    digest: 7bd6615f71c04cd1b660e715b7134bc2054010ffaf4fcf8f763cdd092cc5e3bc
+    name: zoho-dmarc-mcp
+    type: application
+    urls:
+    - https://nephilus.github.io/zoho-dmarc-mcp/zoho-dmarc-mcp-0.1.0.tgz
+    version: 0.1.0
+generated: "2026-10-05T15:23:17.142724152Z"
