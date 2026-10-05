@@ -49,6 +49,9 @@ def test_loopback_form_rejects_cross_origin_and_creates_secret_without_echo(tmp_
             form = response.read().decode()
             assert response.headers["Cache-Control"] == "no-store"
             assert response.headers["X-Frame-Options"] == "DENY"
+            # no-referrer makes browsers send Origin: null on form POSTs,
+            # which correctly fails this server's strict origin validation.
+            assert response.headers["Referrer-Policy"] == "same-origin"
         csrf = re.search(r'name="csrf" value="([^"]+)"', form).group(1)
         key = "synthetic-not-a-real-key-1234567890"
         body = urlencode({"csrf": csrf, "tunnel_id": "tunnel_" + "0" * 32, "api_key": key}).encode()
@@ -60,6 +63,12 @@ def test_loopback_form_rejects_cross_origin_and_creates_secret_without_echo(tmp_
             assert error.code == 403
             assert key not in error.read().decode()
         origin = url.split("/setup/")[0]
+        request = Request(url, data=body, headers={"Origin": "null"})
+        try:
+            urlopen(request, timeout=5)
+            raise AssertionError("Opaque-origin submission accepted")
+        except HTTPError as error:
+            assert error.code == 403
         request = Request(url, data=body, headers={"Origin": origin})
         with urlopen(request, timeout=5) as response:
             assert response.status == 200
