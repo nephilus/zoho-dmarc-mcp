@@ -1,0 +1,26 @@
+name: Validate
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false}
+      - name: Build reproducible development environment
+        run: docker build -t dmarc-dev .devcontainer
+      - name: Test inside development container
+        run: docker run --rm --user root -v "$PWD:/workspace" -w /workspace dmarc-dev sh -c 'uv sync --frozen && uv run --frozen python -m pytest -q'
+      - name: Build runtime and check non-root read-only execution
+        run: |
+          docker build -t dmarc-ci .
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp dmarc-ci python -c 'import os; assert os.getuid()==10001; from zoho_dmarc.queries import Queries; assert Queries("/tmp/missing.sqlite").health()["status"]=="never_initialized"'
+      - name: Lint and validate Helm chart
+        run: |
+          docker run --rm --user root -v "$PWD:/workspace" -w /workspace dmarc-dev sh -c 'sh ops/install_helm.sh && uv run --frozen "$HOME/.local/bin/helm" lint charts/zoho-dmarc-mcp --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa && "$HOME/.local/bin/helm" template fixture charts/zoho-dmarc-mcp --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | uv run --frozen python ops/validate_chart.py'
+      - name: Synthetic Kubernetes deployment
+        run: sh ops/kubernetes_smoke.sh

@@ -1,0 +1,27 @@
+# Release automation replaces the empty application digest with the built image.
+image:
+  repository: ghcr.io/nephilus/zoho-dmarc-mcp
+  digest: ""
+  pullPolicy: IfNotPresent
+tunnel:
+  image: ghcr.io/openai/tunnel-client@sha256:119799b778ba8411a124f53588f9dc837fd62ba03e5fadf77d675123c92ab58e
+  secretName: openai-tunnel
+zoho:
+  secretName: zoho-oauth
+config:
+  secretName: zoho-dmarc-config
+  remediationUtc: ""
+persistence:
+  size: 10Gi
+  storageClass: ""
+  existingClaim: ""
+resources:
+  collector:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {cpu: "1", memory: 768Mi}
+  server:
+    requests: {cpu: 100m, memory: 64Mi}
+    limits: {cpu: "1", memory: 384Mi}
+  tunnel:
+    requests: {cpu: 50m, memory: 32Mi}
+    limits: {cpu: 500m, memory: 256Mi}

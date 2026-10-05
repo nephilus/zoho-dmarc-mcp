@@ -1,0 +1,6 @@
+apiVersion: v2
+name: zoho-dmarc-mcp
+description: Zoho DMARC collection and read-only MCP through OpenAI Secure MCP Tunnel
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

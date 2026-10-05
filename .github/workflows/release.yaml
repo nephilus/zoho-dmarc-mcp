@@ -1,0 +1,93 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  publish:
+    if: github.repository == 'nephilus/zoho-dmarc-mcp'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false}
+      - name: Validate release version
+        run: |
+          test "$GITHUB_REF_NAME" = "v$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml)"
+          test "$GITHUB_REF_NAME" = "v$(sed -n 's/^version: //p' charts/zoho-dmarc-mcp/Chart.yaml)"
+      - name: Run tests in devcontainer
+        run: |
+          docker build -t dmarc-dev .devcontainer
+          docker run --rm --user root -v "$PWD:/workspace" -w /workspace dmarc-dev sh -c 'uv sync --frozen && uv run --frozen python -m pytest -q'
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        id: image
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/nephilus/zoho-dmarc-mcp:${{ github.ref_name }}
+          labels: org.opencontainers.image.source=https://github.com/nephilus/zoho-dmarc-mcp
+          provenance: mode=max
+          sbom: true
+      - name: Prepare Helm and chart
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          docker run --rm --user root -v "$PWD:/workspace" -w /workspace dmarc-dev sh -c 'sh ops/install_helm.sh && cp "$HOME/.local/bin/helm" /workspace/helm'
+          python - <<'PY'
+          import os, pathlib
+          file = pathlib.Path('charts/zoho-dmarc-mcp/values.yaml')
+          file.write_text(file.read_text().replace('digest: ""', 'digest: "' + os.environ['IMAGE_DIGEST'] + '"'))
+          PY
+          ./helm lint charts/zoho-dmarc-mcp
+          ./helm template fixture charts/zoho-dmarc-mcp > /tmp/dmarc-rendered.yaml
+          docker run --rm --user root -v "$PWD:/workspace" -v /tmp/dmarc-rendered.yaml:/rendered.yaml:ro -w /workspace dmarc-dev sh -c 'uv run --frozen python ops/validate_chart.py < /rendered.yaml'
+          docker pull "ghcr.io/nephilus/zoho-dmarc-mcp@$IMAGE_DIGEST"
+          docker tag "ghcr.io/nephilus/zoho-dmarc-mcp@$IMAGE_DIGEST" dmarc-ci
+          sh ops/kubernetes_smoke.sh
+          mkdir -p dist
+          ./helm package charts/zoho-dmarc-mcp -d dist
+      - name: Publish identical chart to GHCR and retained Helm index
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          printf '%s' "$GH_TOKEN" | ./helm registry login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          ./helm push dist/*.tgz oci://ghcr.io/nephilus/charts
+          git clone --branch gh-pages --single-branch "https://github.com/$GITHUB_REPOSITORY.git" /tmp/dmarc-pages
+          cp dist/*.tgz /tmp/dmarc-pages/
+          ./helm repo index /tmp/dmarc-pages --url https://nephilus.github.io/zoho-dmarc-mcp/ --merge /tmp/dmarc-pages/index.yaml
+          python - <<'PY'
+          import json, os, pathlib
+          evidence = {'commit': os.environ['GITHUB_SHA'], 'chart_version': os.environ['GITHUB_REF_NAME'][1:], 'application_digest': os.environ['IMAGE_DIGEST'], 'tunnel_digest': 'sha256:119799b778ba8411a124f53588f9dc837fd62ba03e5fadf77d675123c92ab58e', 'validation': 'devcontainer tests, image smoke, helm lint, chart boundaries and synthetic Kubernetes deployment passed'}
+          pathlib.Path('/tmp/dmarc-pages/' + os.environ['GITHUB_REF_NAME'] + '-evidence.json').write_text(json.dumps(evidence, indent=2))
+          PY
+          git -C /tmp/dmarc-pages config user.name github-actions
+          git -C /tmp/dmarc-pages config user.email github-actions@users.noreply.github.com
+          git -C /tmp/dmarc-pages add .
+          git -C /tmp/dmarc-pages commit -m "Publish $GITHUB_REF_NAME"
+          git -C /tmp/dmarc-pages -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" push
+          gh release create "$GITHUB_REF_NAME" dist/*.tgz "/tmp/dmarc-pages/$GITHUB_REF_NAME-evidence.json" --title "$GITHUB_REF_NAME" --generate-notes
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: /tmp/dmarc-pages
+  pages:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        id: deployment

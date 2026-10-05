@@ -4,8 +4,9 @@ COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
+COPY zoho_dmarc ./zoho_dmarc
 COPY poc/hello.py ./poc/hello.py
 RUN useradd --create-home --uid 10001 app
 ENV PATH="/app/.venv/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 USER 10001:10001
-CMD ["python", "poc/hello.py"]
+CMD ["python", "-m", "zoho_dmarc", "server"]
