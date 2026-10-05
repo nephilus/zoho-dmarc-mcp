@@ -1,0 +1,7 @@
+{
+  "commit": "9007d63eefd3f97d76cb9ceb810f42052344573f",
+  "chart_version": "0.1.1",
+  "application_digest": "sha256:753a563a06a271f433fa965164fe70aa93c054d99917a4dbb9933d7ea7e290e8",
+  "tunnel_digest": "sha256:119799b778ba8411a124f53588f9dc837fd62ba03e5fadf77d675123c92ab58e",
+  "validation": "devcontainer tests, image smoke, helm lint, chart boundaries and synthetic Kubernetes deployment passed"
+}
